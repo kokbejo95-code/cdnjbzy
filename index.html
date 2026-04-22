@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+<meta charset="UTF-8">
+<title>GitHub CDN Pro Ultimate</title>
+
+<style>
+body{
+    font-family:Arial;
+    background:#0d1117;
+    color:#e6edf3;
+    padding:20px;
+}
+input,button,select,textarea{
+    width:100%;
+    padding:10px;
+    margin:6px 0;
+    border-radius:6px;
+    border:none;
+}
+button{
+    background:#238636;
+    color:#fff;
+    cursor:pointer;
+}
+.copy{background:#30363d}
+.preview{
+    background:#161b22;
+    padding:10px;
+    border-radius:8px;
+}
+</style>
+</head>
+
+<body>
+
+<h2>⚡ GitHub CDN Pro Ultimate</h2>
+
+<button onclick="pasteClipboard()">📋 جلب من Clipboard</button>
+
+<input id="input" placeholder="repo أو رابط GitHub">
+<button onclick="loadFiles()">📂 جلب ملفات الريبو</button>
+
+<select id="files"></select>
+
+<button onclick="generate()">Generate CDN</button>
+
+<h3>CDN</h3>
+<textarea id="cdn"></textarea>
+<button class="copy" onclick="copyText('cdn')">Copy CDN</button>
+
+<h3>Code</h3>
+<textarea id="code"></textarea>
+<button class="copy" onclick="copyText('code')">Copy Code</button>
+
+<h3>Preview</h3>
+<div class="preview" id="preview"></div>
+
+<script>
+
+let repoData = {};
+
+async function pasteClipboard(){
+    let text = await navigator.clipboard.readText();
+    document.getElementById("input").value = text;
+}
+
+function parseGitHub(url){
+
+    if(!url.includes("github.com")){
+        return {repo:url};
+    }
+
+    let clean = url.replace("https://github.com/","").replace("http://github.com/","");
+    let parts = clean.split("/");
+
+    let repo = parts[0] + "/" + parts[1];
+
+    let branch = "main";
+    let file = "";
+
+    if(parts.includes("blob")){
+        let i = parts.indexOf("blob");
+        branch = parts[i+1];
+        file = parts.slice(i+2).join("/");
+    }
+
+    return {repo,branch,file};
+}
+
+// جلب الملفات من GitHub API
+async function loadFiles(){
+
+    let input = document.getElementById("input").value.trim();
+    let data = parseGitHub(input);
+
+    repoData = data;
+
+    if(!data.repo){
+        alert("اكتب repo صحيح");
+        return;
+    }
+
+    let url = `https://api.github.com/repos/${data.repo}/contents`;
+
+    let res = await fetch(url);
+    let files = await res.json();
+
+    let select = document.getElementById("files");
+    select.innerHTML = "";
+
+    files.forEach(f=>{
+        let opt = document.createElement("option");
+        opt.value = f.path;
+        opt.textContent = f.path;
+        select.appendChild(opt);
+    });
+}
+
+function generate(){
+
+    let file = document.getElementById("files").value;
+
+    let repo = repoData.repo;
+    let branch = repoData.branch || "main";
+
+    if(!repo || !file){
+        alert("اختار ملف");
+        return;
+    }
+
+    let cdn = `https://cdn.jsdelivr.net/gh/${repo}@${branch}/${file}`;
+    document.getElementById("cdn").value = cdn;
+
+    let ext = file.split('.').pop().toLowerCase();
+    let code = "";
+    let preview = "";
+
+    if(ext==="js"){
+        code = `<script src="${cdn}"><\/script>`;
+        preview = `<iframe src="${cdn}" style="width:100%;height:200px;border:none"><\/iframe>`;
+    }
+    else if(ext==="css"){
+        code = `<link rel="stylesheet" href="${cdn}">`;
+        preview = `<div>CSS Loaded<\/div>`;
+    }
+    else if(["png","jpg","jpeg","gif","webp","svg"].includes(ext)){
+        code = `<img src="${cdn}"/>`;
+        preview = `<img src="${cdn}" style="max-width:100%"/>`;
+    }
+    else{
+        code = cdn;
+        preview = `<a href="${cdn}" target="_blank">Open File<\/a>`;
+    }
+
+    document.getElementById("code").value = code;
+    document.getElementById("preview").innerHTML = preview;
+}
+
+function copyText(id){
+    let el = document.getElementById(id);
+    el.select();
+    document.execCommand("copy");
+}
+
+</script>
+
+</body>
+</html>
